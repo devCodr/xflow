@@ -232,11 +232,12 @@
         let rates = { USD_PEN: 0, PEN_USD: 0, BTC_USD: 0, BTC_PEN: 0 };
 
         async function fetchRates() {
-            const sunatRes = await fetch("https://api.apis.net.pe/v1/tipo-cambio-sunat");
+            // Use the local serverless proxy on Vercel to avoid CORS issues
+            const sunatRes = await fetch("/api/tipo-cambio-sunat");
             const sunat = await sunatRes.json();
             rates.USD_PEN = sunat.venta;
             rates.PEN_USD = 1 / sunat.compra;
-            const btcRes = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,pen");
+            const btcRes = await fetch("/api/coingecko-bitcoin");
             const btc = await btcRes.json();
             rates.BTC_USD = btc.bitcoin.usd;
             rates.BTC_PEN = btc.bitcoin.pen;
