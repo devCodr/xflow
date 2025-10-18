@@ -13,6 +13,10 @@
             --transition: 0.3s ease;
         }
 
+        * {
+            box-sizing: border-box;
+        }
+
         @media (prefers-color-scheme: light) {
             :root {
                 --bg: #f8fafc;
@@ -90,6 +94,20 @@
             color: var(--primary);
             font-size: 1.3rem;
             margin: 0 0 1rem;
+        }
+
+        .fields {
+            display: flex;
+            gap: 12px;
+
+            .field {
+                flex: 1;
+            }
+
+            input {
+                width: 100%;
+            }
+
         }
 
         .converter,
@@ -172,10 +190,58 @@
             color: var(--muted);
             font-size: .85rem;
         }
+
+        /* Top ticker styles */
+        .top-ticker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--card);
+            color: var(--text);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            z-index: 9999;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ticker-inner {
+            display: inline-block;
+            white-space: nowrap;
+            will-change: transform;
+            animation: scroll-left 18s linear infinite;
+            padding-left: 100%;
+        }
+
+        @keyframes scroll-left {
+            0% {
+                transform: translateX(0%);
+            }
+
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        .ticker-item {
+            margin: 0 1.25rem;
+            font-weight: 600;
+        }
+
+        /* push body down to not hide content under fixed ticker */
+        body.ticker-visible {
+            padding-top: 38px;
+        }
     </style>
 </head>
 
 <body>
+    <div class="top-ticker" id="topTicker" style="display:none">
+        <div class="ticker-inner" id="tickerInner">Loading...</div>
+    </div>
     <header>
         <div class="brand">
 
@@ -210,8 +276,14 @@
         <div class="section">
             <h2>📊 Percentage Calculator</h2>
             <div class="percentage">
-                <input type="number" id="percentage" placeholder="Percentage (%)">
-                <input type="number" id="baseValue" placeholder="Base amount">
+                <div class="fields">
+                    <div class="field">
+                        <input type="number" id="percentage" placeholder="Percentage (%)">
+                    </div>
+                    <div class="field">
+                        <input type="number" id="baseValue" placeholder="Base amount">
+                    </div>
+                </div>
                 <div class="result" id="percentageResult">Result will appear here</div>
             </div>
         </div>
@@ -231,6 +303,40 @@
     <script>
         let rates = { USD_PEN: 0, PEN_USD: 0, BTC_USD: 0, BTC_PEN: 0 };
 
+        // Formatting helpers
+        function fmtCurrency(val) {
+            // currencies (USD, PEN) truncated to 2 decimals (not rounded)
+            const n = Number(val);
+            if (!isFinite(n)) return '0.00';
+            return (Math.floor(n * 100) / 100).toFixed(2);
+        }
+
+        function fmtBTC(val) {
+            // BTC truncated to 3 decimals (not rounded)
+            const n = Number(val);
+            if (!isFinite(n)) return '0.000';
+            return (Math.floor(n * 1000) / 1000).toFixed(3);
+        }
+
+        function updateTickerText() {
+            const ticker = document.getElementById('tickerInner');
+            // build strings per user's requested format
+            // Example desired: "1 USD = 3.38 PEN | 1 PEN (S/.) = 0.29 USD | BTC = 106.802"
+            const usdPen = fmtCurrency(rates.USD_PEN);
+            const penUsd = fmtCurrency(rates.PEN_USD);
+            const btcUsd = fmtBTC(rates.BTC_USD);
+            const parts = [];
+            parts.push(`1 USD = ${usdPen} PEN`);
+            parts.push(`1 PEN (S/.) = ${penUsd} USD`);
+            parts.push(`BTC = ${btcUsd}`);
+            ticker.innerHTML = parts.map(p => `<span class="ticker-item">${p}</span>`).join('');
+            const top = document.getElementById('topTicker');
+            if (top.style.display === 'none') {
+                top.style.display = 'block';
+                document.body.classList.add('ticker-visible');
+            }
+        }
+
         async function fetchRates() {
             // Use the local serverless proxy on Vercel to avoid CORS issues
             const sunatRes = await fetch("/api/tipo-cambio-sunat");
@@ -242,6 +348,8 @@
             rates.BTC_USD = btc.bitcoin.usd;
             rates.BTC_PEN = btc.bitcoin.pen;
             document.getElementById("rateInfo").textContent = `1 USD = ${rates.USD_PEN.toFixed(3)} PEN | 1 BTC = ${rates.BTC_PEN.toLocaleString()} PEN`;
+            // update top ticker with formatted values
+            updateTickerText();
         }
 
         function convert() {
