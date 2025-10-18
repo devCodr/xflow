@@ -208,7 +208,8 @@
                 display: flex;
                 white-space: nowrap;
                 will-change: transform;
-                animation: scroll-left 35s linear infinite;
+                animation: scroll-left 10s linear infinite;
+
                 padding-left: 100%;
                 align-items: center;
             }
@@ -230,6 +231,12 @@
 
                 &:not(:last-child) {
                     border-right: 1px solid rgba(0, 0, 0, 0.185);
+                }
+            }
+
+            @media (min-width: 768px) {
+                .ticker-inner {
+                    animation: scroll-left 35s linear infinite;
                 }
             }
         }
