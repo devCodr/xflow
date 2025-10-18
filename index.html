@@ -218,6 +218,8 @@
                 padding: 6px 1rem;
                 font-size: 0.9rem;
                 gap: 6px;
+                align-items: center;
+
 
                 svg {
                     display: block;
@@ -318,16 +320,13 @@
     <script>
         let rates = { USD_PEN: 0, PEN_USD: 0, BTC_USD: 0, BTC_PEN: 0 };
 
-        // Formatting helpers
         function fmtCurrency(val) {
-            // currencies (USD, PEN) truncated to 2 decimals (not rounded)
             const n = Number(val);
             if (!isFinite(n)) return '0.00';
             return (Math.floor(n * 100) / 100).toFixed(2);
         }
 
         function fmtBTC(val) {
-            // BTC truncated to 3 decimals (not rounded)
             const n = Number(val);
             if (!isFinite(n)) return '0.000';
             return (Math.floor(n * 1000) / 1000).toFixed(3);
@@ -335,11 +334,9 @@
 
         function updateTickerText() {
             const ticker = document.getElementById('tickerInner');
-            // build strings per user's requested format
-            // Example desired: "1 USD = 3.38 PEN | 1 PEN (S/.) = 0.29 USD | BTC = 106.802"
             const usdPen = fmtCurrency(rates.USD_PEN);
             const penUsd = fmtCurrency(rates.PEN_USD);
-            const btcUsd = fmtBTC(rates.BTC_USD);
+            const btcUsdInt = Number(Math.floor(rates.BTC_USD)).toLocaleString();
 
             const btcIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
             <g fill="none" fill-rule="evenodd">
@@ -352,7 +349,7 @@
             const parts = [];
             parts.push(`<b>1</b> USD = <b>${usdPen}</b> S/. (PEN)`);
             parts.push(`<b>1</b> S/. (PEN) = <b>${penUsd}</b> USD`);
-            parts.push(` ${btcIcon} <b style="color:#F7931A">BTC</b> = <b>${btcUsd}</b>`);
+            parts.push(` ${btcIcon} <b style="color:#F7931A">1 BTC</b> = <b>${btcUsdInt}</b> USD`);
             ticker.innerHTML = parts.map(p => `<span class="ticker-item">${p}</span>`).join('');
             const top = document.getElementById('topTicker');
             if (top.style.display === 'none') {
@@ -372,7 +369,6 @@
             rates.BTC_USD = btc.bitcoin.usd;
             rates.BTC_PEN = btc.bitcoin.pen;
             document.getElementById("rateInfo").textContent = `1 USD = ${rates.USD_PEN.toFixed(3)} PEN | 1 BTC = ${rates.BTC_PEN.toLocaleString()} PEN`;
-            // update top ticker with formatted values
             updateTickerText();
         }
 
