@@ -202,17 +202,24 @@
             border-bottom: 1px solid rgba(0, 0, 0, 0.06);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
             z-index: 9999;
-            height: 38px;
-            display: flex;
-            align-items: center;
             overflow: hidden;
+
+            .ticker-item {
+                display: inline-block;
+                padding: 6px 1rem;
+                font-size: 0.9rem;
+
+                &:not(:last-child) {
+                    border-right: 1px solid rgba(0, 0, 0, 0.1);
+                }
+            }
         }
 
         .ticker-inner {
-            display: inline-block;
+            display: flex;
             white-space: nowrap;
             will-change: transform;
-            animation: scroll-left 18s linear infinite;
+            animation: scroll-left 35s linear infinite;
             padding-left: 100%;
         }
 
@@ -226,10 +233,7 @@
             }
         }
 
-        .ticker-item {
-            margin: 0 1.25rem;
-            font-weight: 600;
-        }
+
 
         /* push body down to not hide content under fixed ticker */
         body.ticker-visible {
@@ -326,9 +330,9 @@
             const penUsd = fmtCurrency(rates.PEN_USD);
             const btcUsd = fmtBTC(rates.BTC_USD);
             const parts = [];
-            parts.push(`1 USD = ${usdPen} PEN`);
-            parts.push(`1 PEN (S/.) = ${penUsd} USD`);
-            parts.push(`BTC = ${btcUsd}`);
+            parts.push(`<b>1</b> USD = <b>${usdPen}</b> (S/.)`);
+            parts.push(`<b>1</b> (S/.) = <b>${penUsd}</b> USD`);
+            parts.push(`<b>BTC</b> = <b>${btcUsd}</b>`);
             ticker.innerHTML = parts.map(p => `<span class="ticker-item">${p}</span>`).join('');
             const top = document.getElementById('topTicker');
             if (top.style.display === 'none') {
