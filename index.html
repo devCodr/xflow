@@ -61,7 +61,6 @@
         .logo {
             width: 44px;
             height: 44px;
-
         }
 
         .title {
@@ -99,15 +98,14 @@
         .fields {
             display: flex;
             gap: 12px;
+        }
 
-            .field {
-                flex: 1;
-            }
+        .fields .field {
+            flex: 1;
+        }
 
-            input {
-                width: 100%;
-            }
-
+        .fields input {
+            width: 100%;
         }
 
         .converter,
@@ -191,7 +189,7 @@
             font-size: .85rem;
         }
 
-        /* Top ticker styles (continuous/looping) */
+        /* Top ticker styles (JS-driven continuous looping) */
         .top-ticker {
             position: fixed;
             top: 0;
@@ -205,21 +203,22 @@
             overflow: hidden;
         }
 
+        .ticker-wrapper {
+            width: 100%;
+            overflow: hidden;
+        }
+
         .ticker-track {
             display: flex;
-            width: max-content;
             align-items: center;
             white-space: nowrap;
             will-change: transform;
-            /* animation duration will be set via a CSS variable for easy override */
-            --ticker-duration: 20s;
-            animation: scroll-left var(--ticker-duration) linear infinite;
         }
 
         .ticker-item {
             display: inline-flex;
             padding: 6px 1rem;
-            font-size: 0.9rem;
+            font-size: .9rem;
             gap: 6px;
             align-items: center;
         }
@@ -234,25 +233,6 @@
         .ticker-item:not(:last-child) {
             border-right: 1px solid rgba(0, 0, 0, 0.185);
         }
-
-        @media (min-width: 768px) {
-            .ticker-track {
-                --ticker-duration: 30s;
-            }
-        }
-
-        @keyframes scroll-left {
-            0% {
-                transform: translateX(0);
-            }
-
-            /* move one-third of the duplicated track to make 3x copies seamless */
-            100% {
-                transform: translateX(-66.6667%);
-            }
-        }
-
-
 
         /* push body down to not hide content under fixed ticker */
         body.ticker-visible {
@@ -359,7 +339,11 @@
             parts.push(` ${btcIcon} <b style="color:#F7931A">1 BTC</b> = <b>${btcUsdInt}</b> USD`);
 
             const itemsHtml = parts.map(p => `<span class="ticker-item">${p}</span>`).join('');
-            // Duplicate content inside the same track (content repeated 3x) for seamless looping
+
+            // stop existing loop, reset pos and update content (3x copies)
+            stopTickerLoop();
+            _tickerState.pos = 0;
+            track.style.transform = 'translateX(0)';
             track.innerHTML = itemsHtml + itemsHtml + itemsHtml;
 
             // Show ticker
@@ -369,20 +353,24 @@
                 document.body.classList.add('ticker-visible');
             }
 
-            // Measure widths and adjust animation speed proportionally (optional improvement)
-            // If content is very short, increase duration so it's not too fast
+            // Measure widths and set speed, then start loop
             requestAnimationFrame(() => {
                 try {
                     const totalW = track.getBoundingClientRect().width; // triplicated width
                     const singleW = totalW / 3;
                     const containerW = top.getBoundingClientRect().width;
-                    // base speed: pixels per second ~ 60
                     const pixels = singleW || containerW;
-                    const baseSpeed = 60; // px/s
+                    const baseSpeed = 60; // px/s reference
                     const duration = Math.max(8, (pixels / baseSpeed));
-                    track.style.setProperty('--ticker-duration', duration + 's');
+                    // compute speed so singleW scrolls in `duration` seconds
+                    const speed = pixels / duration;
+                    _tickerState.singleW = singleW;
+                    _tickerState.speed = Math.max(20, Math.min(400, speed));
+                    // start the JS-driven loop
+                    startTickerLoop();
                 } catch (e) {
                     // ignore measurement errors
+                    startTickerLoop();
                 }
             });
         }
@@ -400,6 +388,68 @@
             document.getElementById("rateInfo").textContent = `1 USD = ${rates.USD_PEN.toFixed(3)} PEN | 1 BTC = ${rates.BTC_PEN.toLocaleString()} PEN`;
             updateTickerText();
         }
+
+        // JS-driven ticker loop (requestAnimationFrame) to avoid gaps on large screens
+        let _tickerState = {
+            rafId: null,
+            lastTs: null,
+            pos: 0,
+            speed: 60, // pixels per second, will be adapted
+            singleW: 0,
+            running: false
+        };
+
+        function startTickerLoop() {
+            const track = document.getElementById('tickerTrack');
+            const top = document.getElementById('topTicker');
+            if (!track || track.children.length === 0) return;
+
+            // measure widths
+            const totalW = track.getBoundingClientRect().width; // triplicated width
+            const singleW = totalW / 3;
+            _tickerState.singleW = singleW;
+
+            // adapt speed so singleW scroll takes a comfortable time
+            const baseSpeed = 60; // px/s
+            _tickerState.speed = Math.max(40, Math.min(160, baseSpeed));
+
+            _tickerState.running = true;
+            _tickerState.lastTs = null;
+
+            function step(ts) {
+                if (!_tickerState.running) return;
+                if (!_tickerState.lastTs) _tickerState.lastTs = ts;
+                const dt = (ts - _tickerState.lastTs) / 1000; // seconds
+                _tickerState.lastTs = ts;
+                _tickerState.pos += _tickerState.speed * dt;
+
+                // loop when pos exceeds single width
+                if (_tickerState.pos >= _tickerState.singleW) {
+                    _tickerState.pos = _tickerState.pos % _tickerState.singleW;
+                }
+
+                // apply transform (negative to move left)
+                track.style.transform = `translateX(${-_tickerState.pos}px)`;
+                _tickerState.rafId = requestAnimationFrame(step);
+            }
+
+            if (_tickerState.rafId) cancelAnimationFrame(_tickerState.rafId);
+            _tickerState.rafId = requestAnimationFrame(step);
+        }
+
+        function stopTickerLoop() {
+            if (_tickerState.rafId) cancelAnimationFrame(_tickerState.rafId);
+            _tickerState.rafId = null;
+            _tickerState.running = false;
+            _tickerState.lastTs = null;
+        }
+
+        // restart on resize to recalc widths
+        window.addEventListener('resize', () => {
+            // small debounce
+            stopTickerLoop();
+            setTimeout(() => startTickerLoop(), 120);
+        });
 
         function convert() {
             const amount = parseFloat(document.getElementById("amount").value);
