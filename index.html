@@ -353,23 +353,57 @@
                 document.body.classList.add('ticker-visible');
             }
 
-            // Measure widths and set speed, then start loop
+            // Measure widths, ensure enough copies to cover container (avoid end-gap), set speed, then start loop
             requestAnimationFrame(() => {
                 try {
-                    const totalW = track.getBoundingClientRect().width; // triplicated width
-                    const singleW = totalW / 3;
-                    const containerW = top.getBoundingClientRect().width;
-                    const pixels = singleW || containerW;
+                    const containerW = top.getBoundingClientRect().width || window.innerWidth;
+
+                    // First, insert a single copy to measure the width of one items set
+                    track.innerHTML = itemsHtml;
+                    const itemsW = track.getBoundingClientRect().width || 0;
+
+                    // If measurement failed or itemsW is zero, fallback to previous 3x setup
+                    if (!itemsW) {
+                        track.innerHTML = itemsHtml + itemsHtml + itemsHtml;
+                        const totalW = track.getBoundingClientRect().width;
+                        _tickerState.singleW = totalW / 3;
+                        _tickerState.speed = Math.max(20, Math.min(400, (_tickerState.singleW / Math.max(8, (_tickerState.singleW / 60)))));
+                        startTickerLoop();
+                        return;
+                    }
+
+
+                    // Build final HTML by repeating items until the track covers container + one items set
+                    let finalHtml = '';
+                    // Start with at least 3 copies
+                    for (let i = 0; i < 3; i++) finalHtml += itemsHtml;
+                    track.innerHTML = finalHtml;
+                    let totalW = track.getBoundingClientRect().width || 0;
+
+                    // Append more copies until the track width is >= container width + two items widths
+                    // (extra slack avoids any visual gap on large screens)
+                    while (totalW < (containerW + itemsW * 2)) {
+                        finalHtml += itemsHtml;
+                        track.innerHTML = finalHtml;
+                        totalW = track.getBoundingClientRect().width || 0;
+                        // safety break to avoid infinite loop
+                        if (finalHtml.length > itemsHtml.length * 50) break;
+                    }
+
+                    // singleW is the width of one items set
+                    _tickerState.singleW = itemsW;
+
+                    // Compute speed so singleW scrolls in a comfortable duration
+                    const pixels = _tickerState.singleW;
                     const baseSpeed = 60; // px/s reference
                     const duration = Math.max(8, (pixels / baseSpeed));
-                    // compute speed so singleW scrolls in `duration` seconds
                     const speed = pixels / duration;
-                    _tickerState.singleW = singleW;
                     _tickerState.speed = Math.max(20, Math.min(400, speed));
+
                     // start the JS-driven loop
                     startTickerLoop();
                 } catch (e) {
-                    // ignore measurement errors
+                    // ignore measurement errors and fall back to starting loop
                     startTickerLoop();
                 }
             });
@@ -405,13 +439,12 @@
             if (!track || track.children.length === 0) return;
 
             // measure widths
-            const totalW = track.getBoundingClientRect().width; // triplicated width
-            const singleW = totalW / 3;
-            _tickerState.singleW = singleW;
-
-            // adapt speed so singleW scroll takes a comfortable time
-            const baseSpeed = 60; // px/s
-            _tickerState.speed = Math.max(40, Math.min(160, baseSpeed));
+            const totalW = track.getBoundingClientRect().width;
+            // if singleW wasn't set, try to guess from total and number of children
+            if (!_tickerState.singleW) {
+                const childCount = Math.max(1, track.childElementCount);
+                _tickerState.singleW = totalW / Math.max(1, childCount);
+            }
 
             _tickerState.running = true;
             _tickerState.lastTs = null;
@@ -423,13 +456,15 @@
                 _tickerState.lastTs = ts;
                 _tickerState.pos += _tickerState.speed * dt;
 
-                // loop when pos exceeds single width
-                if (_tickerState.pos >= _tickerState.singleW) {
-                    _tickerState.pos = _tickerState.pos % _tickerState.singleW;
+                // wrap position within singleW to avoid huge numbers
+                if (_tickerState.singleW > 0) {
+                    if (_tickerState.pos >= _tickerState.singleW) {
+                        _tickerState.pos = _tickerState.pos % _tickerState.singleW;
+                    }
                 }
 
                 // apply transform (negative to move left)
-                track.style.transform = `translateX(${-_tickerState.pos}px)`;
+                track.style.transform = `translate3d(${-_tickerState.pos}px,0,0)`;
                 _tickerState.rafId = requestAnimationFrame(step);
             }
 
@@ -444,11 +479,15 @@
             _tickerState.lastTs = null;
         }
 
-        // restart on resize to recalc widths
+        // restart on resize to recalc widths (debounced)
+        let _resizeTimer = null;
         window.addEventListener('resize', () => {
-            // small debounce
-            stopTickerLoop();
-            setTimeout(() => startTickerLoop(), 120);
+            if (_resizeTimer) clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(() => {
+                // recalc content copies and widths
+                stopTickerLoop();
+                updateTickerText();
+            }, 150);
         });
 
         function convert() {
