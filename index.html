@@ -246,8 +246,9 @@
                 transform: translateX(0);
             }
 
+            /* move one-third of the duplicated track to make 3x copies seamless */
             100% {
-                transform: translateX(-50%);
+                transform: translateX(-66.6667%);
             }
         }
 
@@ -358,8 +359,8 @@
             parts.push(` ${btcIcon} <b style="color:#F7931A">1 BTC</b> = <b>${btcUsdInt}</b> USD`);
 
             const itemsHtml = parts.map(p => `<span class="ticker-item">${p}</span>`).join('');
-            // Duplicate content inside the same track (content + content) for seamless looping
-            track.innerHTML = itemsHtml + itemsHtml;
+            // Duplicate content inside the same track (content repeated 3x) for seamless looping
+            track.innerHTML = itemsHtml + itemsHtml + itemsHtml;
 
             // Show ticker
             const top = document.getElementById('topTicker');
@@ -372,8 +373,8 @@
             // If content is very short, increase duration so it's not too fast
             requestAnimationFrame(() => {
                 try {
-                    const totalW = track.getBoundingClientRect().width; // duplicated width
-                    const singleW = totalW / 2;
+                    const totalW = track.getBoundingClientRect().width; // triplicated width
+                    const singleW = totalW / 3;
                     const containerW = top.getBoundingClientRect().width;
                     // base speed: pixels per second ~ 60
                     const pixels = singleW || containerW;
